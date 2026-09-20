@@ -1,38 +1,98 @@
-name: Build Windows Desktop App
+name: Build Fact Video Generator for Windows
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    runs-on: windows-2019
+    name: Build Windows App
+    runs-on: windows-2022
 
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.8'
+      - name: Setup Python 3.8.10 x86
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8.10"
+          architecture: x86
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Verify Python
+        shell: cmd
+        run: |
+          python --version
+          python -c "import sys; print(sys.executable)"
 
-    - name: Build Executable with PyInstaller
-      run: |
-        pyinstaller --noconsole --onefile ^
-          --add-data "font.ttf;." ^
-          --add-data "bg1.mp3;." ^
-          --add-data "bg2.mp3;." ^
-          --name="FactVideoGenerator" app.py
+      - name: Install Python dependencies
+        shell: cmd
+        run: |
+          python -m pip install --upgrade "pip<24.1"
+          python -m pip install -r requirements.txt
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: Windows-Desktop-App
-        path: dist/FactVideoGenerator.exe
+      - name: Verify source files
+        shell: cmd
+        run: |
+          if not exist "app.py" (
+            echo ERROR: app.py is missing
+            exit /b 1
+          )
+          if not exist "font.ttf" (
+            echo ERROR: font.ttf is missing
+            exit /b 1
+          )
+          if not exist "bg1.mp3" (
+            echo ERROR: bg1.mp3 is missing
+            exit /b 1
+          )
+          if not exist "bg2.mp3" (
+            echo ERROR: bg2.mp3 is missing
+            exit /b 1
+          )
+          echo All required source files and assets found.
+
+      - name: Build Windows application
+        shell: cmd
+        run: |
+          pyinstaller ^
+            --noconfirm ^
+            --clean ^
+            --windowed ^
+            --onedir ^
+            --add-data "font.ttf;." ^
+            --add-data "bg1.mp3;." ^
+            --add-data "bg2.mp3;." ^
+            --name FactVideoGenerator ^
+            app.py
+
+          if errorlevel 1 (
+            echo ERROR: PyInstaller build failed.
+            exit /b 1
+          )
+
+      - name: Create portable ZIP
+        shell: powershell
+        run: |
+          $zip = "FactVideoGenerator-Portable.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          
+          Compress-Archive -Path "dist\FactVideoGenerator\*" -DestinationPath $zip -Force
+          
+          if (-not (Test-Path $zip)) {
+            Write-Host "ERROR: Portable ZIP was not created."
+            exit 1
+          }
+          Write-Host "Portable ZIP created successfully."
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: FactVideoGenerator-Windows
+          path: FactVideoGenerator-Portable.zip
+          if-no-files-found: error
