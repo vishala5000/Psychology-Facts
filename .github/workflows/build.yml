@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2019 # Windows 2019 runner ensures optimal Windows 7/10 compatibility binaries
+    runs-on: windows-2019
 
     steps:
     - name: Check out repository
@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python 3.8
       uses: actions/setup-python@v4
       with:
-      python-version: '3.8'
+        python-version: '3.8'
 
     - name: Install dependencies
       run: |
@@ -25,7 +25,11 @@ jobs:
 
     - name: Build Executable with PyInstaller
       run: |
-        pyinstaller --noconsole --onefile --name="FactVideoGenerator" app.py
+        pyinstaller --noconsole --onefile ^
+          --add-data "font.ttf;." ^
+          --add-data "bg1.mp3;." ^
+          --add-data "bg2.mp3;." ^
+          --name="FactVideoGenerator" app.py
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
